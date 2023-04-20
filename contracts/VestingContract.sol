@@ -34,6 +34,21 @@ contract VestingContract {
     mapping(address => VestingSchedule[]) public vestingSchedules;
 
     /**
+     * @notice Emitted when a vesting schedule is created
+     * @param beneficiary The address of the beneficiary
+     * @param start The start UNIX timestamp of the vesting period
+     * @param duration The duration of the vesting period in months
+     */
+    event VestingScheduleCreated(address indexed beneficiary, uint256 start, uint256 duration, uint256 amountTotal);
+
+    /**
+     * @notice Emitted when tokens are released
+     * @param beneficiary The address of the beneficiary
+     * @param amount The amount of tokens released
+     */
+    event TokensReleased(address indexed beneficiary, uint256 amount);
+
+    /**
      * @param _token The token to be vested
      */
     constructor(IERC20 _token) {
@@ -70,6 +85,8 @@ contract VestingContract {
                 released: 0
             })
         );
+
+        emit VestingScheduleCreated(_beneficiary, _start, _duration, _amountTotal);
     }
 
     /**
@@ -81,6 +98,8 @@ contract VestingContract {
         uint256 schedulesLength = schedules.length;
         require(schedulesLength > 0, "VestingContract: no vesting schedules for beneficiary");
 
+        uint256 totalRelease;
+
         for (uint256 i = 0; i < schedulesLength; i++) {
             VestingSchedule storage schedule = schedules[i];
 
@@ -89,10 +108,14 @@ contract VestingContract {
             if (amountToSend > 0) {
                 // update the released amount
                 schedule.released += amountToSend;
+                // update the total released amount
+                totalRelease += amountToSend;
                 // transfer the tokens to the beneficiary
                 token.safeTransfer(schedule.beneficiary, amountToSend);
             }
         }
+
+        emit TokensReleased(_beneficiary, totalRelease);
     }
 
     /**
