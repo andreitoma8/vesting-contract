@@ -8,6 +8,12 @@ import { MockERC20, VestingContract } from "../typechain-types";
 
 chai.use(chaiAsPromised);
 
+enum DurationUnits {
+    Days,
+    Weeks,
+    Months
+}
+
 describe("VestingContract", () => {
     let token: MockERC20;
     let vesting: VestingContract;
@@ -51,36 +57,36 @@ describe("VestingContract", () => {
     describe("createVestingSchedule", () => {
         it("should rever if beneficiary is zero address", async () => {
             await expect(
-                vesting.createVestingSchedule(ethers.constants.AddressZero, startTime, duration, amountToLock),
+                vesting.createVestingSchedule(ethers.constants.AddressZero, startTime, duration, DurationUnits.Months, amountToLock),
             ).to.be.revertedWith("VestingContract: beneficiary is the zero address");
         });
 
         it("should revert if amount is zero", async () => {
-            await expect(vesting.createVestingSchedule(teamWallet.address, startTime, duration, 0)).to.be.revertedWith(
+            await expect(vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, 0)).to.be.revertedWith(
                 "VestingContract: amount is 0",
             );
         });
 
         it("should revert if duration is zero", async () => {
-            await expect(vesting.createVestingSchedule(teamWallet.address, startTime, 0, amountToLock)).to.be.revertedWith(
+            await expect(vesting.createVestingSchedule(teamWallet.address, startTime, 0, DurationUnits.Months, amountToLock)).to.be.revertedWith(
                 "VestingContract: duration is 0",
             );
         });
 
         it("should revert if start time is in the past", async () => {
             await expect(
-                vesting.createVestingSchedule(teamWallet.address, startTime - 61, duration, amountToLock),
+                vesting.createVestingSchedule(teamWallet.address, startTime - 61, duration, DurationUnits.Months, amountToLock),
             ).to.be.revertedWith("VestingContract: start is before current time");
         });
 
         it("should transfer tokens to vesting contract", async () => {
             expect(
-                await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock),
+                await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock),
             ).to.changeTokenBalance(token, vesting, amountToLock);
         });
 
         it("should create vesting schedule", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             const vestingSchedule = await vesting.vestingSchedules(teamWallet.address, 0);
 
@@ -94,7 +100,7 @@ describe("VestingContract", () => {
 
     describe("vestedAmount", () => {
         it("should return 0 if vesting has not started", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             const schedule = await vesting.vestingSchedules(teamWallet.address, 0);
 
@@ -104,7 +110,7 @@ describe("VestingContract", () => {
         });
 
         it("should return the total amount if vesting has ended", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             await increaseTime(duration * 60 * 60 * 24 * 30 + 61);
 
@@ -116,7 +122,7 @@ describe("VestingContract", () => {
         });
 
         it("should return the correct amount if vesting is in progress", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             await increaseTime(61);
 
@@ -134,7 +140,7 @@ describe("VestingContract", () => {
 
     describe("releasableAmount", () => {
         it("should correctly return the releasable amount", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             await increaseTime(61);
 
@@ -164,7 +170,7 @@ describe("VestingContract", () => {
         });
 
         it("should not send tokens if there are no tokens to release", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             const balanceBefore = await token.balanceOf(teamWallet.address);
 
@@ -176,7 +182,7 @@ describe("VestingContract", () => {
         });
 
         it("should correctly release tokens", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             await increaseTime(60 * 60 * 24 * 30 + 61);
 
@@ -189,10 +195,12 @@ describe("VestingContract", () => {
     describe("getReleaseableAmount", () => {
         it("should return 0 if beneficiary has no vesting schedules", async () => {
             const releasableAmount = await vesting.getReleaseableAmount(teamWallet.address);
+
+            expect(releasableAmount).to.equal(0);
         });
 
         it("should correctly return the releasable amount", async () => {
-            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, amountToLock);
+            await vesting.createVestingSchedule(teamWallet.address, startTime, duration, DurationUnits.Months, amountToLock);
 
             await increaseTime(61);
 

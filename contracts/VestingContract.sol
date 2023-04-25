@@ -15,13 +15,21 @@ contract VestingContract {
      */
     IERC20 public immutable token;
 
+    enum DurationUnits {
+        Days,
+        Weeks,
+        Months
+    }
+
     struct VestingSchedule {
         // beneficiary of tokens after they are released
         address beneficiary;
         // start time of the vesting period
         uint256 start;
-        // duration of the vesting period in months
+        // duration of the vesting period in DurationUnits
         uint256 duration;
+        // units of the duration
+        DurationUnits durationUnits;
         // total amount of tokens to be released at the end of the vesting;
         uint256 amountTotal;
         // amount of tokens released
@@ -37,9 +45,12 @@ contract VestingContract {
      * @notice Emitted when a vesting schedule is created
      * @param beneficiary The address of the beneficiary
      * @param start The start UNIX timestamp of the vesting period
-     * @param duration The duration of the vesting period in months
+     * @param duration The duration of the vesting period in DurationUnits
+     * @param durationUnits The units of the duration(0 = days, 1 = weeks, 2 = months)
      */
-    event VestingScheduleCreated(address indexed beneficiary, uint256 start, uint256 duration, uint256 amountTotal);
+    event VestingScheduleCreated(
+        address indexed beneficiary, uint256 start, uint256 duration, DurationUnits durationUnits, uint256 amountTotal
+    );
 
     /**
      * @notice Emitted when tokens are released
@@ -59,13 +70,18 @@ contract VestingContract {
      * @notice Creates a vesting schedule
      * @param _beneficiary The address of the beneficiary
      * @param _start The start UNIX timestamp of the vesting period
-     * @param _duration The duration of the vesting period in months
+     * @param _duration The duration of the vesting period in DurationUnits
+     * @param _durationUnits The units of the duration(0 = days, 1 = weeks, 2 = months)
      * @param _amountTotal The total amount of tokens to be vested
      * @dev Approve the contract to transfer the tokens before calling this function
      */
-    function createVestingSchedule(address _beneficiary, uint256 _start, uint256 _duration, uint256 _amountTotal)
-        external
-    {
+    function createVestingSchedule(
+        address _beneficiary,
+        uint256 _start,
+        uint256 _duration,
+        DurationUnits _durationUnits,
+        uint256 _amountTotal
+    ) external {
         // perform input checks
         require(_beneficiary != address(0), "VestingContract: beneficiary is the zero address");
         require(_duration > 0, "VestingContract: duration is 0");
@@ -81,12 +97,13 @@ contract VestingContract {
                 beneficiary: _beneficiary,
                 start: _start,
                 duration: _duration,
+                durationUnits: _durationUnits,
                 amountTotal: _amountTotal,
                 released: 0
             })
         );
 
-        emit VestingScheduleCreated(_beneficiary, _start, _duration, _amountTotal);
+        emit VestingScheduleCreated(_beneficiary, _start, _duration, _durationUnits, _amountTotal);
     }
 
     /**
@@ -147,12 +164,20 @@ contract VestingContract {
      * @param _schedule The vesting schedule
      */
     function vestedAmount(VestingSchedule memory _schedule) public view returns (uint256) {
+        uint256 sliceInSeconds;
+        if (_schedule.durationUnits == DurationUnits.Days) {
+            sliceInSeconds = 1 days;
+        } else if (_schedule.durationUnits == DurationUnits.Weeks) {
+            sliceInSeconds = 7 days;
+        } else if (_schedule.durationUnits == DurationUnits.Months) {
+            sliceInSeconds = 30 days;
+        }
         if (block.timestamp < _schedule.start) {
             return 0;
-        } else if (block.timestamp >= _schedule.start + _schedule.duration * 30 days) {
+        } else if (block.timestamp >= _schedule.start + _schedule.duration * sliceInSeconds) {
             return _schedule.amountTotal;
         } else {
-            uint256 monthsPassed = (block.timestamp - _schedule.start) / 30 days;
+            uint256 monthsPassed = (block.timestamp - _schedule.start) / sliceInSeconds;
             return (_schedule.amountTotal * monthsPassed) / _schedule.duration;
         }
     }
