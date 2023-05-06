@@ -5,7 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /**
  * @title VestingContract
- * @notice This is a simple vesting contract that allows to create vesting schedules for a beneficiary with monthly unlocks.
+ * @notice This is a simple vesting contract that allows to create vesting schedules for a beneficiary with daily/weekly/monthly and/or cliff unlocking.
  */
 contract VestingContract {
     using SafeERC20 for IERC20;
@@ -84,7 +84,6 @@ contract VestingContract {
     ) external {
         // perform input checks
         require(_beneficiary != address(0), "VestingContract: beneficiary is the zero address");
-        require(_duration > 0, "VestingContract: duration is 0");
         require(_amountTotal > 0, "VestingContract: amount is 0");
         require(_start >= block.timestamp, "VestingContract: start is before current time");
 
@@ -164,6 +163,13 @@ contract VestingContract {
      * @param _schedule The vesting schedule
      */
     function vestedAmount(VestingSchedule memory _schedule) public view returns (uint256) {
+        if (_schedule.duration == 0) {
+            if (block.timestamp >= _schedule.start) {
+                return _schedule.amountTotal;
+            } else {
+                return 0;
+            }
+        }
         uint256 sliceInSeconds;
         if (_schedule.durationUnits == DurationUnits.Days) {
             sliceInSeconds = 1 days;

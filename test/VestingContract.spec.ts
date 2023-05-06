@@ -2,7 +2,6 @@ import type { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import chai, { expect } from "chai";
 import chaiAsPromised from "chai-as-promised";
 import { ethers } from "hardhat";
-import { BigNumber } from "ethers";
 
 import { MockERC20, VestingContract } from "../typechain-types";
 
@@ -67,12 +66,6 @@ describe("VestingContract", () => {
             );
         });
 
-        it("should revert if duration is zero", async () => {
-            await expect(vesting.createVestingSchedule(teamWallet.address, startTime, 0, DurationUnits.Months, amountToLock)).to.be.revertedWith(
-                "VestingContract: duration is 0",
-            );
-        });
-
         it("should revert if start time is in the past", async () => {
             await expect(
                 vesting.createVestingSchedule(teamWallet.address, startTime - 61, duration, DurationUnits.Months, amountToLock),
@@ -107,6 +100,28 @@ describe("VestingContract", () => {
             const vestedAmount = await vesting.vestedAmount(schedule);
 
             expect(vestedAmount).to.equal(0);
+        });
+
+        it("should return 0 if duration is 0 and vesting has not started", async () => {
+            await vesting.createVestingSchedule(teamWallet.address, startTime, 0, DurationUnits.Months, amountToLock);
+
+            const schedule = await vesting.vestingSchedules(teamWallet.address, 0);
+
+            const vestedAmount = await vesting.vestedAmount(schedule);
+
+            expect(vestedAmount).to.equal(0);
+        });
+
+        it("should return the total amount if duration is 0 and vesting has ended", async () => {
+            await vesting.createVestingSchedule(teamWallet.address, startTime, 0, DurationUnits.Months, amountToLock);
+
+            await increaseTime(61);
+
+            const schedule = await vesting.vestingSchedules(teamWallet.address, 0);
+
+            const vestedAmount = await vesting.vestedAmount(schedule);
+
+            expect(vestedAmount).to.equal(amountToLock);
         });
 
         it("should return the total amount if vesting has ended", async () => {
